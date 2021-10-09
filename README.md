@@ -3,8 +3,11 @@ Simple AntiDebugging and HWID lib in c++
 
 
 //antidebug and hwid header library by Manucod
+
 // simple
+
 // header only
+
 // API
 
 CodeGarbage:
