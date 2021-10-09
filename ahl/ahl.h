@@ -5,17 +5,147 @@
 // API
 //CODEGARBAGEINIT() and CODEGARBAGE();
 //AhlIsDebuggerPresent(bool check) // bool will be true if debugger was found
+// String obfusctation (beware basic)
+// XorStr( s ) 
+// XorStrW(s)
 
 #include <Windows.h>
 #include <iostream>
-
+#include <string>
+#include <array>
+#include <cstdarg>
 #define INLINE static inline
-#define EXEOBFUS_STATICKEY "nb89hsudgf78sddfssd"
-#define EXEOBFUS_CIPHERKEYHEADER "XEOBFUSCIPHERKEYHEAD"
-#define EXEOBFUS_CIPHERKEYHEADERLEN 20
-#define EXEOBFUS_CIPHERKEYLEN (EXEOBFUS_CIPHERKEYHEADERLEN - sizeof(short) -1)
-#define PROTECTSTRING(string,buf) (string, buf)
+#define BEGIN_NAMESPACE( x ) namespace x {
+#define END_NAMESPACE }
 
+BEGIN_NAMESPACE(XorCompileTime)
+
+constexpr auto time = __TIME__;
+constexpr auto seed = static_cast<int>(time[7]) + static_cast<int>(time[6]) * 10 + static_cast<int>(time[4]) * 60 + static_cast<int>(time[3]) * 600 + static_cast<int>(time[1]) * 3600 + static_cast<int>(time[0]) * 36000;
+
+// 1988, Stephen Park and Keith Miller
+// "Random Number Generators: Good Ones Are Hard To Find", considered as "minimal standard"
+// Park-Miller 31 bit pseudo-random number generator, implemented with G. Carta's optimisation:
+// with 32-bit math and without division
+
+template < int N >
+struct RandomGenerator
+{
+private:
+	static constexpr unsigned a = 16807; // 7^5
+	static constexpr unsigned m = 2147483647; // 2^31 - 1
+
+	static constexpr unsigned s = RandomGenerator< N - 1 >::value;
+	static constexpr unsigned lo = a * (s & 0xFFFF); // Multiply lower 16 bits by 16807
+	static constexpr unsigned hi = a * (s >> 16); // Multiply higher 16 bits by 16807
+	static constexpr unsigned lo2 = lo + ((hi & 0x7FFF) << 16); // Combine lower 15 bits of hi with lo's upper bits
+	static constexpr unsigned hi2 = hi >> 15; // Discard lower 15 bits of hi
+	static constexpr unsigned lo3 = lo2 + hi;
+
+public:
+	static constexpr unsigned max = m;
+	static constexpr unsigned value = lo3 > m ? lo3 - m : lo3;
+};
+
+template <>
+struct RandomGenerator< 0 >
+{
+	static constexpr unsigned value = seed;
+};
+
+template < int N, int M >
+struct RandomInt
+{
+	static constexpr auto value = RandomGenerator< N + 1 >::value % M;
+};
+
+template < int N >
+struct RandomChar
+{
+	static const char value = static_cast<char>(1 + RandomInt< N, 0x7F - 1 >::value);
+};
+
+template < size_t N, int K, typename Char >
+struct XorString
+{
+private:
+	const char _key;
+	std::array< Char, N + 1 > _encrypted;
+
+	constexpr Char enc(Char c) const
+	{
+		return c ^ _key;
+	}
+
+	Char dec(Char c) const
+	{
+		return c ^ _key;
+	}
+
+public:
+	template < size_t... Is >
+	constexpr __forceinline XorString(const Char* str, std::index_sequence< Is... >) : _key(RandomChar< K >::value), _encrypted{ enc(str[Is])... }
+	{
+	}
+
+	__forceinline decltype(auto) decrypt(void)
+	{
+		for (size_t i = 0; i < N; ++i) {
+			_encrypted[i] = dec(_encrypted[i]);
+		}
+		_encrypted[N] = '\0';
+		return _encrypted.data();
+	}
+};
+
+//--------------------------------------------------------------------------------
+//-- Note: XorStr will __NOT__ work directly with functions like printf.
+//         To work with them you need a wrapper function that takes a const char*
+//         as parameter and passes it to printf and alike.
+//
+//         The Microsoft Compiler/Linker is not working correctly with variadic 
+//         templates!
+//  
+//         Use the functions below or use std::cout (and similar)!
+//--------------------------------------------------------------------------------
+
+static auto w_printf = [](const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vprintf_s(fmt, args);
+	va_end(args);
+};
+
+static auto w_printf_s = [](const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vprintf_s(fmt, args);
+	va_end(args);
+};
+
+
+static auto w_sprintf_s = [](char* buf, size_t buf_size, const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vsprintf_s(buf, buf_size, fmt, args);
+	va_end(args);
+};
+
+static auto w_sprintf_s_ret = [](char* buf, size_t buf_size, const char* fmt, ...) {
+	int ret;
+	va_list args;
+	va_start(args, fmt);
+	ret = vsprintf_s(buf, buf_size, fmt, args);
+	va_end(args);
+	return ret;
+};
+
+#define XorStr( s ) []{ constexpr XorCompileTime::XorString< sizeof(s)/sizeof(char) - 1, __COUNTER__, char > expr( s, std::make_index_sequence< sizeof(s)/sizeof(char) - 1>() ); return expr; }().decrypt()
+#define XorStrW( s ) []{ constexpr XorCompileTime::XorString< sizeof(s)/sizeof(wchar_t) - 1, __COUNTER__, wchar_t > expr( s, std::make_index_sequence< sizeof(s)/sizeof(wchar_t) - 1>() ); return expr; }().decrypt()
+
+
+
+END_NAMESPACE
 
 INLINE void ZZ_strchrrepl(char* string, char torepl, char repl);
 INLINE char* ZZ_ExpandNewlines(char* in);
@@ -37,7 +167,6 @@ INLINE int ZZ_islower(int c);
 INLINE int ZZ_isalpha(int c);
 INLINE bool ZZ_isintegral(float f);
 INLINE bool ZZ_isanumber(const char* s);
-
 INLINE bool ZZ_strToVect(const char* string, float* vect, int dim);
 INLINE bool ZZ_isVector(const char* string, int size, int dim);
 INLINE bool ZZ_isInteger(const char* string, int size);
@@ -46,15 +175,17 @@ INLINE bool ZZ_IsEqualUnitWSpace(char* cmp1, char* cmp2);
 INLINE bool ZZ_isNumeric(const char* string, int size);
 
 
+
+
 #define CODEGARBAGEINIT() int garbageint1 = 0xff777711; int garbageint2 = 0x87178633; int garbageint3 = 500; int garbageint4 = 880; int garbageint5 = 880; char garbagebuf1[1024]; char garbagebuf2[1024]; char garbagebuf3[1024]
 #define CODEGARBAGE1( ) garbageint5 = ZZ_ShortSwap(ZZ_LongSwap(garbageint2)); ZZ_isalpha(garbageint3);ZZ_islower( garbageint5 )
 #define CODEGARBAGE2( ) garbageint3 = ZZ_isupper(ZZ_isprint( garbageint4 )); ZZ_isintegral( garbageint4 )
-#define CODEGARBAGE3( ) if(ZZ_isanumber(PROTECTSTRING("7000 200 199 4", garbagebuf1))){ ZZ_CountChar(PROTECTSTRING("7000 200 199 4", garbagebuf1), garbageint4); }else{ ZZ_strichr( PROTECTSTRING("7000 200 199 4", garbagebuf1), '\n'); } ZZ_isprint( 'P' )
-#define CODEGARBAGE4( ) ZZ_Compress( (char*)PROTECTSTRING("7000 200 199 4", garbagebuf1) ); ZZ_ExpandNewlines((char*) PROTECTSTRING("7000 200 199 4", garbagebuf1) )
-#define CODEGARBAGE5( ) if(ZZ_stricmpn(PROTECTSTRING("open \"PhysicalDrive\7873af\\\"", garbagebuf2), garbagebuf1, garbageint4) == 0){ ZZ_strlwr(garbagebuf1); }else{ garbagebuf1[5] = 'T'; garbagebuf1[9] = 'q'; } ZZ_strchrrepl(garbagebuf1, '7', 'I')
-#define CODEGARBAGE6( ) garbageint4 = 6; if(ZZ_isFloat(PROTECTSTRING("70000.6786852", garbagebuf2), garbageint4)){ sprintf_s(garbagebuf3, PROTECTSTRING("%d %s Check drive", garbagebuf1), garbageint1, garbagebuf2); } garbageint5 = ZZ_CountChar(garbagebuf3, 9)
-
+#define CODEGARBAGE3( ) if(ZZ_isanumber((XorStr("7000 200 199 4"), garbagebuf1))){ ZZ_CountChar((XorStr("7000 200 199 4"), garbagebuf1), garbageint4); }else{ ZZ_strichr( (XorStr("7000 200 199 4"), garbagebuf1), '\n'); } ZZ_isprint( 'P' )
+#define CODEGARBAGE4( ) ZZ_Compress( (char*)(XorStr("7000 200 199 4"), garbagebuf1) ); ZZ_ExpandNewlines((char*) (XorStr("7000 200 199 4"), garbagebuf1) )
+#define CODEGARBAGE5( ) if(ZZ_stricmpn((XorStr("open \"PhysicalDrive\78734saf\\\""), garbagebuf2), garbagebuf1, garbageint4) == 0){ ZZ_strlwr(garbagebuf1); }else{ garbagebuf1[5] = 'T'; garbagebuf1[9] = 'q'; } ZZ_strchrrepl(garbagebuf1, '7', 'I')
+#define CODEGARBAGE6( ) garbageint4 = 6; if(ZZ_isFloat((XorStr("70000.6786852"), garbagebuf2), garbageint4)){ sprintf_s(garbagebuf3, (XorStr("%d %s Check drive"), garbagebuf1), garbageint1, garbagebuf2); } garbageint5 = ZZ_CountChar(garbagebuf3, 9)
 #define CODEGARBAGE( ) CODEGARBAGE1( ); CODEGARBAGE2( ); CODEGARBAGE3( ); CODEGARBAGE4( ); CODEGARBAGE5( );	CODEGARBAGE6( )
+
 
 
 void antihwdebug(bool check) {
@@ -114,18 +245,18 @@ void TrapFlagCheck(bool check) {
 
 
 const char* checknames[12] = {
-	("OllyDbg"),
-	("JSwat"),
-	("Ghidra"),
-	("Cheat Engine"),
-	("IDA v7.2.181105"),
-	("Phantom"),
-	("x32dbg"),
-	("x64dbg"),
-	("wireshark"),
-	("windbg"),
-	("debugger"),
-	("IDA -"),
+	XorStr("OllyDbg"),
+	XorStr("JSwat"),
+	XorStr("Ghidra"),
+	XorStr("Cheat Engine"),
+	XorStr("IDA v7.2.181105"),
+	XorStr("Phantom"),
+	XorStr("x32dbg"),
+	XorStr("x64dbg"),
+	XorStr("wireshark"),
+	XorStr("windbg"),
+	XorStr("debugger"),
+	XorStr("IDA -"),
 };
 
 
@@ -139,18 +270,44 @@ bool checkwindows(std::string str) {
 	return false;
 }
 
-__declspec(noinline) void AhlIsDebuggerPresent(bool &check) {
+typedef NTSTATUS(NTAPI* pfnNtQueryInformationProcess)(
+	_In_      HANDLE           ProcessHandle,
+	_In_      UINT             ProcessInformationClass,
+	_Out_     PVOID            ProcessInformation,
+	_In_      ULONG            ProcessInformationLength,
+	_Out_opt_ PULONG           ReturnLength
+	);
+const UINT ProcessDebugPort = 7;
+
+void NTDebugCheck(bool check) {
+
+	pfnNtQueryInformationProcess NtQueryInformationProcess = NULL;
+	NTSTATUS status;
+	DWORD isDebuggerPresent = 0;
+	HMODULE hNtDll = LoadLibraryA((XorStr("ntdll.dll")));
+
+	if (NULL != hNtDll)
+	{
+		NtQueryInformationProcess = (pfnNtQueryInformationProcess)GetProcAddress(hNtDll, XorStr("NtQueryInformationProcess"));
+		if (NULL != NtQueryInformationProcess)
+		{
+			status = NtQueryInformationProcess(
+				GetCurrentProcess(),
+				ProcessDebugPort,
+				&isDebuggerPresent,
+				sizeof(DWORD),
+				NULL);
+			if (status == 0x00000000 && isDebuggerPresent != 0)
+			{
+				check = true;
+			}
+		}
+	} 
+
+}
+
+void WindoWDebugCheck(bool check) {
 	CODEGARBAGEINIT();
-	CODEGARBAGE();
-	if (IsDebuggerPresent() != 0) {
-		check = true;
-	}
-	CODEGARBAGE();
-	TrapFlagCheck(check);
-	CODEGARBAGE();
-	RemoteDebuggerCheck(check);
-	CODEGARBAGE();
-	antihwdebug(check);
 	CODEGARBAGE();
 	for (HWND hwnd = GetTopWindow(NULL); hwnd != NULL; hwnd = GetNextWindow(hwnd, GW_HWNDNEXT))
 	{
@@ -168,17 +325,64 @@ __declspec(noinline) void AhlIsDebuggerPresent(bool &check) {
 		}
 	}
 	CODEGARBAGE();
-	if (IsDebuggerPresent() != 0) {
+}
+
+DWORD CalcFuncCrc(PUCHAR funcBegin, PUCHAR funcEnd)
+{
+	DWORD crc = 0;
+	for (; funcBegin < funcEnd; ++funcBegin)
+	{
+		crc += *funcBegin;
+	}
+	return crc;
+}
+#pragma auto_inline(off)
+void DebuggeeFunction()
+{
+	int calc = 0;
+	calc += 2;
+	calc <<= 8;
+	calc -= 3;
+} 
+void DebuggeeFunctionEnd()
+{
+};
+#pragma auto_inline(on)
+DWORD g_origCrc = 0x2bd0; 
+
+void CRCDebugCheck(bool check) {
+
+	DWORD crc = CalcFuncCrc((PUCHAR)DebuggeeFunction, (PUCHAR)DebuggeeFunctionEnd);
+	if (g_origCrc != crc)
+	{
+		check = true;
+	} 
+
+}
+
+__declspec(noinline) void AhlIsDebuggerPresent(bool &check) {
+	CODEGARBAGEINIT();
+	CODEGARBAGE();
+	NTDebugCheck(check);
+	if (IsDebuggerPresent() != 0)
+	{
 		check = true;
 	}
 	CODEGARBAGE();
+	TrapFlagCheck(check);
+	CODEGARBAGE();
+	RemoteDebuggerCheck(check);
+	CODEGARBAGE();
+	CODEGARBAGE();
+	CRCDebugCheck(check);
+	CODEGARBAGE();
+	antihwdebug(check);
+	CODEGARBAGE();
+	WindoWDebugCheck(check);
+	CODEGARBAGE();
+	CODEGARBAGE();
 	antihwdebug(check);
 }
-
-
-
-
-
 
 
 INLINE short   ZZ_ShortSwap(short l)
@@ -256,7 +460,6 @@ INLINE bool ZZ_isprintstring(char* s) {
 	}
 	return 1;
 }
-
 
 
 INLINE int ZZ_stricmpn(const char* s1, const char* s2, int n) {
@@ -346,8 +549,6 @@ INLINE void ZZ_bstrcpy(char* dest, char* src) {
 	*dest = 0;
 }
 
-
-
 INLINE void ZZ_strlcat(char* dest, int size, const char* src, int cpylimit) {
 
 	int		l1;
@@ -388,7 +589,6 @@ INLINE void ZZ_TrimCRLF(char* string)
 	}
 }
 
-
 INLINE int  ZZ_strichr(const char* s, char find)
 {
 	char sc;
@@ -417,7 +617,6 @@ INLINE int  ZZ_strichr(const char* s, char find)
 	return -1;
 }
 
-
 INLINE int ZZ_CountChar(const char* string, char tocount)
 {
 	int count;
@@ -430,7 +629,6 @@ INLINE int ZZ_CountChar(const char* string, char tocount)
 
 	return count;
 }
-
 
 INLINE char* ZZ_ExpandNewlines(char* in) {
 	char	string[1024];
@@ -461,7 +659,6 @@ INLINE void ZZ_strchrrepl(char* string, char torepl, char repl) {
 	}
 }
 
-
 INLINE bool ZZ_isNumeric(const char* string, int size) {
 	const char* ptr;
 	int i;
@@ -485,7 +682,6 @@ INLINE bool ZZ_isNumeric(const char* string, int size) {
 
 	return true;
 }
-
 
 INLINE bool ZZ_IsEqualUnitWSpace(char* cmp1, char* cmp2)
 {
@@ -516,8 +712,6 @@ INLINE bool ZZ_IsEqualUnitWSpace(char* cmp1, char* cmp2)
 
 	return 1;
 }
-
-
 
 INLINE bool ZZ_isFloat(const char* string, int size)
 {
@@ -616,8 +810,6 @@ INLINE bool ZZ_isVector(const char* string, int size, int dim)
 
 	return true;
 }
-
-
 
 INLINE bool ZZ_strToVect(const char* string, float* vect, int dim)
 {
