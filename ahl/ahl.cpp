@@ -6,6 +6,7 @@
 
 int main()
 {
+
     CODEGARBAGEINIT();
     CODEGARBAGE();
     Sleep(1000);
@@ -17,6 +18,11 @@ int main()
     AhlIsDebuggerPresent(check);
     CODEGARBAGE();
     Sleep(1000);
+    std::string disk; std::string Guid;
+    GetHostInfo(disk);
+    GetGUID(Guid);
+    std::cout << disk << " "<< Guid << std::endl;
+
     if (check)
     {
         std::cout << XorStr("Debugger Found!\n");
