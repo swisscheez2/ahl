@@ -1,5 +1,5 @@
 # ahl
-Simple AntiDebugging and HWID lib in c++
+Simple AntiDebugging and HWID header lib in c++
 
 
 //antidebug and hwid header library by Manucod
