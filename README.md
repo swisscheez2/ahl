@@ -23,24 +23,30 @@ String Obfuscation:
 
 
 ///HWID API
+
 void GetHostInfo(std::string& result); // gets Host Info in Plaintext
 void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of the current System. 
 ///
-///
-/// 
-/// 
+ 
 /// DISK
+
 /// Serial
+
 /// 
 /// CPU
+
 /// GHZ
+
 /// Cores
 /// 
 /// GRAPHICSCARD
+
 /// not yet
 /// 
 /// RAM
+
 /// Amount (Physical)
+
 /// 
 /// MOTHERBOARD
 /// not yet
