@@ -30,22 +30,24 @@ void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of t
  
 /// DISK
 
-/// Serial
+Serial
 
-/// 
+
 /// CPU
 
-/// GHZ
+ GHZ
 
-/// Cores
-/// 
+ Cores
+
+
 /// GRAPHICSCARD
 
-/// not yet
-/// 
+ not yet
+
+
 /// RAM
 
-/// Amount (Physical)
+Amount (Physical)
 
 /// 
 /// MOTHERBOARD
