@@ -319,11 +319,11 @@ void CRCDebugCheck(bool check) {
 	{
 		check = true;
 	}
-	
+
 	CODEGARBAGE();
 }
 
- void AhlIsDebuggerPresent(bool& check) {
+void AhlIsDebuggerPresent(bool& check) {
 	CODEGARBAGEINIT();
 	CODEGARBAGE();
 	NTDebugCheck(check);
@@ -857,19 +857,20 @@ void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of t
 /// 
 /// 
 /// DISK
-/// 
+/// Serial
 /// 
 /// CPU
-/// 
+/// GHZ
+/// Cores
 /// 
 /// GRAPHICSCARD
-/// 
+/// not yet
 /// 
 /// RAM
-/// 
+/// Amount (Physical)
 /// 
 /// MOTHERBOARD
-/// 
+/// not yet
 /// 
 /// 
 /// 
@@ -1231,6 +1232,7 @@ template<typename OutIter>void hash256(std::ifstream& f, OutIter first, OutIter 
 char PC_Name[MAX_COMPUTERNAME_LENGTH + 1];
 char Username_[16 + 1];
 char CPU_clock[16];
+std::string Ram_;
 
 typedef struct _PROCESSOR_POWER_INFORMATION {
 	ULONG  Number;
@@ -1251,25 +1253,25 @@ void make_info()
 {
 	DWORD size;
 	size = MAX_COMPUTERNAME_LENGTH + 1;
-	GetComputerNameA(PC_Name, &size); 
+	GetComputerNameA(PC_Name, &size);
 	size = 16 + 1;
-	GetUserNameA(Username_, &size); 
+	GetUserNameA(Username_, &size);
 	SYSTEM_INFO sysInfo;
 	GetSystemInfo(&sysInfo);
+
 	size = sysInfo.dwNumberOfProcessors * sizeof(PROCESSOR_POWER_INFORMATION);
 	LPBYTE buf = new BYTE[size];
 	CallNtPowerInformation(ProcessorInformation, NULL, 0, buf, size);
 	PPROCESSOR_POWER_INFORMATION cpuinfo = (PPROCESSOR_POWER_INFORMATION)buf;
-	std::string full_cpu_ratio = intoStr(cpuinfo->MaxMhz) + "GHz";
+	std::string full_cpu_ratio = intoStr(cpuinfo->MaxMhz) + " GHz " + intoStr(sysInfo.dwNumberOfProcessors) + " Cores";
 	full_cpu_ratio.erase(3, 1);
 	full_cpu_ratio.insert(1, ".");
 	memcpy(CPU_clock, full_cpu_ratio.c_str(), sizeof(full_cpu_ratio));
-
-
-
-
-
-
+	
+	MEMORYSTATUSEX statex;
+	statex.dwLength = sizeof(statex);
+	GlobalMemoryStatusEx(&statex);
+	Ram_ += " Ram: " + intoStr(((statex.ullTotalPhys / 1024) / 1024)/ 1024); // round up  is needed I think 
 
 }
 
@@ -1281,11 +1283,9 @@ void GetGUID(std::string& result)
 	DWORD disk_serialINT;
 	GetVolumeInformationA(NULL, NULL, NULL, &disk_serialINT, NULL, NULL, NULL, NULL);
 	std::string HDDserial = std::to_string(disk_serialINT);
-	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock;
-	result = ComputerName;
-	result += Username;
-	result += HDDserial;
-	result += CPU;
+	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock, Ram = Ram_;
+	result = ComputerName;	result += Username;	result += HDDserial;
+	result += CPU;	result += Ram;
 	CODEGARBAGE();
 	std::vector<unsigned char> hash(k_digest_size);
 	hash256(result.begin(), result.end(), hash.begin(), hash.end());
@@ -1310,9 +1310,8 @@ std::string GetHwInfo()
 	{
 		std::cout << XorStr("GetVolumeInformation failed with error ") << GetLastError() << std::endl;
 	}
-
 	std::string HDDserial = std::to_string(disk_serialINT);
-	std::string ComputerName = PC_Name, Username = Username_ , CPU = CPU_clock;
+	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock;
 	std::string result = ComputerName;
 	CODEGARBAGE();
 	result += " ";
@@ -1321,6 +1320,8 @@ std::string GetHwInfo()
 	result += HDDserial;
 	result += " ";
 	result += CPU;
+	result += " ";
+	result += Ram_;
 	return (result);
 }
 

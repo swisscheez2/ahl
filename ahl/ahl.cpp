@@ -18,10 +18,10 @@ int main()
     AhlIsDebuggerPresent(check);
     CODEGARBAGE();
     Sleep(1000);
-    std::string disk; std::string Guid;
-    GetHostInfo(disk);
+    std::string hostinfo; std::string Guid;
+    GetHostInfo(hostinfo);
     GetGUID(Guid);
-    std::cout << disk << " "<< Guid << std::endl;
+    std::cout << "HOST: "<< hostinfo << " GUID: "<< Guid  << " "<< std::endl;
 
     if (check)
     {
