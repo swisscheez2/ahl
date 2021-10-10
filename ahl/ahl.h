@@ -30,7 +30,7 @@ void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of t
 /// Cores
 /// 
 /// GRAPHICSCARD
-/// not yet
+/// Model Name 
 /// 
 /// RAM
 /// Amount (Physical)
@@ -48,6 +48,15 @@ void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of t
 #include <array>
 #include <cstdarg>
 #include <sstream>
+#include <fstream>
+#include <algorithm>
+#include <cassert>
+#include <iterator>
+#include <vector>
+
+#include <powrprof.h>
+#pragma comment(lib, "Powrprof.lib")
+
 #define INLINE static inline
 #define BEGIN_NAMESPACE( x ) namespace x {
 #define END_NAMESPACE }
@@ -138,10 +147,8 @@ public:
 //         use std::cout (and similar)!
 //--------------------------------------------------------------------------------
 
-
 #define XorStr( s ) []{ constexpr XorCompileTime::XorString< sizeof(s)/sizeof(char) - 1, __COUNTER__, char > expr( s, std::make_index_sequence< sizeof(s)/sizeof(char) - 1>() ); return expr; }().decrypt()
 #define XorStrW( s ) []{ constexpr XorCompileTime::XorString< sizeof(s)/sizeof(wchar_t) - 1, __COUNTER__, wchar_t > expr( s, std::make_index_sequence< sizeof(s)/sizeof(wchar_t) - 1>() ); return expr; }().decrypt()
-
 END_NAMESPACE
 
 INLINE void ZZ_strchrrepl(char* string, char torepl, char repl);
@@ -881,14 +888,6 @@ INLINE int ZZ_Compress(char* data_p) {
 
 
 
-#include <powrprof.h>
-#pragma comment(lib, "Powrprof.lib")
-#include <fstream>
-#include <algorithm>
-#include <cassert>
-#include <iterator>
-#include <vector>
-
 
 
 #ifndef BUFFER_SIZE_FOR_INPUT_ITERATOR
@@ -1239,6 +1238,7 @@ char PC_Name[MAX_COMPUTERNAME_LENGTH + 1];
 char Username_[16 + 1];
 char CPU_clock[16];
 std::string Ram_;
+std::string Gpu_;
 
 typedef struct _PROCESSOR_POWER_INFORMATION {
 	ULONG  Number;
@@ -1257,7 +1257,6 @@ std::string intoStr(int in) {
 
 void make_info()
 {
-
 	CODEGARBAGEINIT();
 	CODEGARBAGE();
 	CODEGARBAGE();
@@ -1273,14 +1272,27 @@ void make_info()
 	CallNtPowerInformation(ProcessorInformation, NULL, 0, buf, size);
 	CODEGARBAGE();
 	PPROCESSOR_POWER_INFORMATION cpuinfo = (PPROCESSOR_POWER_INFORMATION)buf;
-	std::string full_cpu_ratio = intoStr(cpuinfo->MaxMhz) + XorStr(" GHz ") + intoStr(sysInfo.dwNumberOfProcessors) + XorStr(" Cores");
+	std::string full_cpu_ratio = std::to_string(cpuinfo->MaxMhz) + XorStr(" GHz ") + intoStr(sysInfo.dwNumberOfProcessors) + XorStr(" Cores");
 	full_cpu_ratio.erase(3, 1);
 	full_cpu_ratio.insert(1, ".");
 	memcpy(CPU_clock, full_cpu_ratio.c_str(), sizeof(full_cpu_ratio));
 	MEMORYSTATUSEX statex;
 	statex.dwLength = sizeof(statex);
 	GlobalMemoryStatusEx(&statex);
-	Ram_ += XorStr(" Ram: ") + intoStr(((statex.ullTotalPhys / 1024) / 1024)/ 1024); // round up  is needed I think 
+	int ramdiv = (statex.ullTotalPhys / 1024) + (statex.ullTotalPhys % 1024 != 0); // round up for GB's
+	ramdiv = ramdiv / 1024 + (ramdiv % 1024 != 0); // round up for GB's
+	ramdiv = ramdiv / 1024 + (ramdiv % 1024 != 0); // round up for GB's
+	Ram_ += XorStr(" Ram: ") + std::to_string(ramdiv);
+
+	DISPLAY_DEVICE dd = { sizeof(dd), 0 };
+	BOOL f = EnumDisplayDevices(NULL, 0, &dd, EDD_GET_DEVICE_INTERFACE_NAME);
+	if (!f)
+		std::cout << "errordisplaydevices ";
+
+	std::wstring ws(dd.DeviceString);
+	std::string str(ws.begin(), ws.end());
+	Gpu_ = std::string(" Gpu: ") + str;
+
 
 	CODEGARBAGE();
 }
@@ -1293,9 +1305,9 @@ void GetGUID(std::string& result)
 	DWORD disk_serialINT;
 	GetVolumeInformationA(NULL, NULL, NULL, &disk_serialINT, NULL, NULL, NULL, NULL);
 	std::string HDDserial = std::to_string(disk_serialINT);
-	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock, Ram = Ram_;
+	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock, Ram = Ram_, Gpu = Gpu_;
 	result = ComputerName;	result += Username;	result += HDDserial;
-	result += CPU;	result += Ram;
+	result += CPU;	result += Ram; result += Gpu;
 	CODEGARBAGE();
 	std::vector<unsigned char> hash(k_digest_size);
 	hash256(result.begin(), result.end(), hash.begin(), hash.end());
@@ -1321,7 +1333,7 @@ std::string GetHwInfo()
 		std::cout << XorStr("GetVolumeInformation failed with error ") << GetLastError() << std::endl;
 	}
 	std::string HDDserial = std::to_string(disk_serialINT);
-	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock;
+	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock ,Gpu = Gpu_;
 	std::string result = ComputerName;
 	CODEGARBAGE();
 	result += " ";
@@ -1332,6 +1344,8 @@ std::string GetHwInfo()
 	result += CPU;
 	result += " ";
 	result += Ram_;
+	result += " ";
+	result += Gpu;
 	return (result);
 }
 

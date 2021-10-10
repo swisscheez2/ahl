@@ -21,7 +21,7 @@ int main()
     std::string hostinfo; std::string Guid;
     GetHostInfo(hostinfo);
     GetGUID(Guid);
-    std::cout << "HOST: "<< hostinfo << " GUID: "<< Guid  << " "<< std::endl;
+    std::cout << " HOST: "<< hostinfo << " GUID: "<< Guid  << " "<< std::endl;
 
     if (check)
     {
