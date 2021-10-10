@@ -5,11 +5,42 @@
 // API
 
 
-//CODEGARBAGEINIT() and CODEGARBAGE();
-//AhlIsDebuggerPresent(bool check) // bool will be true if debugger was found
+//SAFE API
+
+//ANTIDEBUG AND OBFUSCATION
+//CODEGARBAGEINIT() followed by CODEGARBAGE();
+void AhlIsDebuggerPresent(bool& check);
+
 // String obfusctation (beware basic)
-// XorStr( s ) 
+// XorStr(s) 
 // XorStrW(s)
+
+///HWID API
+void GetHostInfo(std::string& result); // gets Host Info in Plaintext
+void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of the current System. 
+///
+///
+/// 
+/// 
+/// DISK
+/// Serial
+/// 
+/// CPU
+/// GHZ
+/// Cores
+/// 
+/// GRAPHICSCARD
+/// not yet
+/// 
+/// RAM
+/// Amount (Physical)
+/// 
+/// MOTHERBOARD
+/// not yet
+/// 
+/// 
+/// 
+
 
 #include <Windows.h>
 #include <iostream>
@@ -780,7 +811,7 @@ INLINE bool ZZ_strToVect(const char* string, float* vect, int dim)
 			continue;
 		}
 
-		vect[i] = atof(ptr);
+		vect[i] = (float)atof(ptr);
 
 		i++;
 
@@ -848,32 +879,7 @@ INLINE int ZZ_Compress(char* data_p) {
 
 
 
-///HWID PART
-//GENERAL
-void GetHostInfo(std::string& result); // gets Host Info in Plaintext
-void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of the current System. 
-///
-///
-/// 
-/// 
-/// DISK
-/// Serial
-/// 
-/// CPU
-/// GHZ
-/// Cores
-/// 
-/// GRAPHICSCARD
-/// not yet
-/// 
-/// RAM
-/// Amount (Physical)
-/// 
-/// MOTHERBOARD
-/// not yet
-/// 
-/// 
-/// 
+
 
 #include <powrprof.h>
 #pragma comment(lib, "Powrprof.lib")
@@ -1251,6 +1257,10 @@ std::string intoStr(int in) {
 
 void make_info()
 {
+
+	CODEGARBAGEINIT();
+	CODEGARBAGE();
+	CODEGARBAGE();
 	DWORD size;
 	size = MAX_COMPUTERNAME_LENGTH + 1;
 	GetComputerNameA(PC_Name, &size);
@@ -1258,21 +1268,21 @@ void make_info()
 	GetUserNameA(Username_, &size);
 	SYSTEM_INFO sysInfo;
 	GetSystemInfo(&sysInfo);
-
 	size = sysInfo.dwNumberOfProcessors * sizeof(PROCESSOR_POWER_INFORMATION);
 	LPBYTE buf = new BYTE[size];
 	CallNtPowerInformation(ProcessorInformation, NULL, 0, buf, size);
+	CODEGARBAGE();
 	PPROCESSOR_POWER_INFORMATION cpuinfo = (PPROCESSOR_POWER_INFORMATION)buf;
-	std::string full_cpu_ratio = intoStr(cpuinfo->MaxMhz) + " GHz " + intoStr(sysInfo.dwNumberOfProcessors) + " Cores";
+	std::string full_cpu_ratio = intoStr(cpuinfo->MaxMhz) + XorStr(" GHz ") + intoStr(sysInfo.dwNumberOfProcessors) + XorStr(" Cores");
 	full_cpu_ratio.erase(3, 1);
 	full_cpu_ratio.insert(1, ".");
 	memcpy(CPU_clock, full_cpu_ratio.c_str(), sizeof(full_cpu_ratio));
-	
 	MEMORYSTATUSEX statex;
 	statex.dwLength = sizeof(statex);
 	GlobalMemoryStatusEx(&statex);
-	Ram_ += " Ram: " + intoStr(((statex.ullTotalPhys / 1024) / 1024)/ 1024); // round up  is needed I think 
+	Ram_ += XorStr(" Ram: ") + intoStr(((statex.ullTotalPhys / 1024) / 1024)/ 1024); // round up  is needed I think 
 
+	CODEGARBAGE();
 }
 
 void GetGUID(std::string& result)
