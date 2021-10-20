@@ -1,3 +1,7 @@
+License Copyleft
+Do whatever you want except if your from china
+
+
 # ahl
 Simple AntiDebugging and HWID header lib in c++
 
@@ -55,3 +59,5 @@ Amount (Physical)
 /// 
 /// 
 /// 
+
+
