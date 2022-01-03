@@ -122,7 +122,7 @@ Serial
 
 /// GRAPHICSCARD
 
- not yet
+Model Name
 
 
 /// RAM
