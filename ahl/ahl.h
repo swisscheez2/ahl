@@ -1,46 +1,28 @@
 #pragma once
 //antidebug and hwid header library by Manucod
-// simple
-// header only
-// API
-
+// simple header only API
 
 //SAFE API
-
 //ANTIDEBUG AND OBFUSCATION
 //CODEGARBAGEINIT() followed by CODEGARBAGE();
+
 void AhlIsDebuggerPresent(bool& check);
-
 // String obfusctation (beware basic)
-// XorStr(s) 
-// XorStrW(s)
-
-///HWID API
+// XorStr(s) (M.B)  XorStrW(s) (Unicode)
+//HWID API
 void GetHostInfo(std::string& result); // gets Host Info in Plaintext
 void GetGUID(std::string& result);// gets hashed Globally Unique Identifier of the current System. 
-///
-///
-/// 
-/// 
-/// DISK
-/// Serial
-/// 
-/// CPU
-/// GHZ
-/// Cores
-/// 
-/// GRAPHICSCARD
-/// Model Name 
-/// 
-/// RAM
-/// Amount (Physical)
-/// 
-/// MOTHERBOARD
-/// not yet
-/// 
-/// 
-/// 
-
+ 
+ //DISK: Serial
+ 
+ //CPU: GHZ - Cores
+ 
+ //GRAPHICSCARD: Model Name 
+ 
+ //RAM: Amount (Physical)
+ 
+ //MOTHERBOARD: not yet
+ 
 
 #include <Windows.h>
 #include <iostream>
@@ -360,6 +342,18 @@ void CRCDebugCheck(bool check) {
 
 	CODEGARBAGE();
 }
+
+
+bool IsJumpInstruction(void* adr) //really simple hook detection.
+{
+	BYTE* inst = (BYTE*)adr;
+	if (inst[0] == 0xe9)
+	{
+		return 1;
+	}
+	return 0;
+}
+
 
 void AhlIsDebuggerPresent(bool& check) {
 	CODEGARBAGEINIT();
@@ -1255,6 +1249,123 @@ std::string intoStr(int in) {
 	return ss.str();
 }
 
+#pragma once
+//#include <ThemidaSDK.h>
+#ifndef CPUID_H
+#define CPUID_H
+
+#ifdef _WIN32
+#include <limits.h>
+#include <intrin.h>
+typedef unsigned __int32  uint32_t;
+
+#else
+#include <stdint.h>
+#endif
+
+class CPUID {
+	uint32_t regs[4];
+
+public:
+	explicit CPUID(unsigned i) {
+#ifdef _WIN32
+		__cpuid((int*)regs, (int)i);
+#else
+		asm volatile
+			("cpuid" : "=a" (regs[0]), "=b" (regs[1]), "=c" (regs[2]), "=d" (regs[3])
+				: "a" (i), "c" (0));
+		// ECX is set to zero for CPUID function 4
+#endif
+	}
+
+	const uint32_t& EAX() const { return regs[0]; }
+	const uint32_t& EBX() const { return regs[1]; }
+	const uint32_t& ECX() const { return regs[2]; }
+	const uint32_t& EDX() const { return regs[3]; }
+};
+
+#endif // CPUID_H#pragma once
+
+
+
+
+std::string MachineGUID() {
+	CODEGARBAGEINIT();
+	CODEGARBAGE();
+	CODEGARBAGE();
+	std::string out;
+
+	HANDLE h = CreateFileW(L"\\\\.\\PhysicalDrive0", 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+
+	if (h == INVALID_HANDLE_VALUE) return NULL;
+
+	STORAGE_PROPERTY_QUERY storagePropertyQuery{};
+
+	storagePropertyQuery.PropertyId = StorageDeviceProperty;
+	storagePropertyQuery.QueryType = PropertyStandardQuery;
+
+	STORAGE_DESCRIPTOR_HEADER storageDescriptorHeader{};
+	CODEGARBAGE();
+	DWORD dwBytesReturned = 0;
+	CODEGARBAGE();
+	if (!DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY, &storagePropertyQuery, sizeof(STORAGE_PROPERTY_QUERY),
+		&storageDescriptorHeader, sizeof(STORAGE_DESCRIPTOR_HEADER), &dwBytesReturned, NULL)) {
+		CloseHandle(h);
+		return NULL;
+	}
+
+	const DWORD dwOutBufferSize = storageDescriptorHeader.Size;
+	CODEGARBAGE();
+	std::unique_ptr<BYTE[]> bufferb{ new BYTE[dwOutBufferSize]{} };
+	CODEGARBAGE();
+	if (!DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY, &storagePropertyQuery, sizeof(STORAGE_PROPERTY_QUERY),
+		bufferb.get(), dwOutBufferSize, &dwBytesReturned, NULL)) {
+		CloseHandle(h);
+		return NULL;
+	}
+
+	STORAGE_DEVICE_DESCRIPTOR* pDeviceDescriptor = reinterpret_cast<STORAGE_DEVICE_DESCRIPTOR*>(bufferb.get());
+
+	const DWORD dwSerialNumberOffset = pDeviceDescriptor->SerialNumberOffset;
+	const DWORD dwProductIdOffset = pDeviceDescriptor->ProductIdOffset;
+
+	if (dwProductIdOffset == 0) return FALSE;
+
+	const char* productId = reinterpret_cast<const char*>(bufferb.get() + dwProductIdOffset);
+
+
+	out.append(productId);
+	out.append(" "); 
+
+	HW_PROFILE_INFO hwProfileInfo;
+	std::wstring HwProfileStr;
+
+	if (GetCurrentHwProfile(&hwProfileInfo))
+		HwProfileStr.append(hwProfileInfo.szHwProfileGuid);
+
+
+
+	out.append((char*)HwProfileStr.c_str());
+	out.append(" ");
+
+	CPUID cpuID(0);
+
+	std::string vendor;
+	vendor += std::string((const char*)&cpuID.EBX(), 4);
+	vendor += std::string((const char*)&cpuID.EDX(), 4);
+	vendor += std::string((const char*)&cpuID.ECX(), 4);
+
+
+	out.append(vendor);
+	out.append(" ");
+
+
+	CloseHandle(h);
+
+	return out;
+}
+
+
 void make_info()
 {
 	CODEGARBAGEINIT();
@@ -1307,7 +1418,7 @@ void GetGUID(std::string& result)
 	std::string HDDserial = std::to_string(disk_serialINT);
 	std::string ComputerName = PC_Name, Username = Username_, CPU = CPU_clock, Ram = Ram_, Gpu = Gpu_;
 	result = ComputerName;	result += Username;	result += HDDserial;
-	result += CPU;	result += Ram; result += Gpu;
+	result += CPU;	result += Ram; result += Gpu; result += MachineGUID();
 	CODEGARBAGE();
 	std::vector<unsigned char> hash(k_digest_size);
 	hash256(result.begin(), result.end(), hash.begin(), hash.end());
@@ -1346,6 +1457,8 @@ std::string GetHwInfo()
 	result += Ram_;
 	result += " ";
 	result += Gpu;
+	result += " MachineGUID ";
+	result += MachineGUID();
 	return (result);
 }
 
